@@ -11,7 +11,6 @@ from __future__ import annotations
 from collections.abc import Iterable
 import copy
 from dataclasses import dataclass, fields
-from functools import lru_cache
 from pathlib import Path
 
 from mlx_openai_server.config import MLXServerConfig
@@ -224,8 +223,12 @@ class ModelRegistry:
         return self._base_path
 
 
-@lru_cache(maxsize=1)
-def get_registry() -> ModelRegistry:
-    """Return the singleton registry, instantiating it lazily."""
+_registry: dict[Path | str | None, ModelRegistry] = {}
 
-    return ModelRegistry()
+
+def get_registry(config_file: Path | str | None) -> ModelRegistry:
+    """Return the singleton registry for the given config file."""
+    key = config_file
+    if key not in _registry:
+        _registry[key] = ModelRegistry(config_file)
+    return _registry[key]

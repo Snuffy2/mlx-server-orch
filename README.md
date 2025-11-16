@@ -6,7 +6,7 @@ If a port is defined, it will use that port (if not already in use). Otherwise i
 
 ## models.yaml
 
-**base_path:** _(optional, defaults to `~/mlx-server-orch`)_ — root directory that contains `models.yaml` and where `logs/` and `pids/` are written. Relative paths are resolved against the config file's location.
+**base_path:** _(optional, defaults to `~/mlx-server-orch`)_ — root directory where `logs/` and `pids/` are written. Relative paths are resolved against the config file's location.
 
 **starting_port:** _(optional, defaults to 5005)_
 
@@ -59,9 +59,18 @@ models:
     trust_remote_code: true
 ```
 
+## Configuration File Location
+
+The `models.yaml` file is searched for in the following order:
+
+1. Path specified via `--config` CLI argument
+2. Path specified in `MLXSERVER_MODELS_PATH` environment variable
+3. `models.yaml` in the current working directory
+4. `models.yaml` in the default base path (`~/mlx-server-orch`)
+
 ## CLI commands
 
-All commands run through `mlx-server-orch <command>`. The `start` command launches child processes and runs detached.
+All commands run through `mlx-server-orch <command>`. The `start` command launches child processes and runs detached. All commands support the global `--config` option to specify the path to `models.yaml`, or set the `MLXSERVER_MODELS_PATH` environment variable.
 
 | Command | Description |
 | --- | --- |
@@ -79,6 +88,14 @@ mlx-server-orch start                   # starts every default model
 mlx-server-orch start medgemma_4b       # start one additional model
 mlx-server-orch status                  # inspect running servers
 mlx-server-orch stop medgemma_4b        # stop one model
+```
+
+You can specify a custom config file:
+
+```bash
+mlx-server-orch --config /path/to/models.yaml start
+# or
+MLXSERVER_MODELS_PATH=/path/to/models.yaml mlx-server-orch start
 ```
 
 * Each started model writes logs to `<base_path>/logs/` (and per-process PID files in `<base_path>/pids/`).

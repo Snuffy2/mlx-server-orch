@@ -38,23 +38,23 @@ def configure_cli_logging() -> None:
     logger.add(sys.stdout, format="{message}", colorize=False)
 
 
-def refresh_model_registry() -> None:
+def refresh_model_registry(config_file: Path | str | None) -> None:
     """Reload the global `REGISTRY` of models, exiting on error.
 
     If the registry reload fails (invalid or missing config), log the
     error and exit the process with a non-zero code.
     """
     try:
-        get_registry().reload()
+        get_registry(config_file).reload()
     except ModelRegistryError as exc:
         logger.error(str(exc))
         raise SystemExit(1) from exc
 
 
-def ensure_models_file_exists() -> None:
+def ensure_models_file_exists(config_file: Path | str | None) -> None:
     """Exit with a helpful error if the models.yaml file is missing."""
 
-    config_path = paths.models_config_file()
+    config_path = Path(config_file or paths.models_config_file())
     if not config_path.exists():
         logger.error(
             f"Missing models configuration: {config_path}. Copy models.yaml-example or create one",
@@ -71,6 +71,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mlx-server-orch",
         description="MLX OpenAI Server Orchestrator — manage MLX model server processes",
+    )
+    parser.add_argument(
+        "--config",
+        help="Path to models.yaml file",
+        default=None,
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -106,15 +111,14 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _process_worker(name, model):
+def _process_worker(name, model, config_file):
     """Entry point target for spawned worker processes.
 
     This configures per-process logging, registers PID cleanup and
     invokes the application entry point (`app.main.start`) for the
     given model configuration.
     """
-    # Load registry first to set the correct base_path in this child process
-    refresh_model_registry()
+    refresh_model_registry(config_file)
 
     try:
         configure_process_logging(name=name)
@@ -317,15 +321,17 @@ def process_alive(pid: int) -> bool:
         return True
 
 
-def start_models(names: list[str] | None, detach: bool = True) -> None:
+def start_models(
+    names: list[str] | None, detach: bool = True, config_file: Path | str | None = None
+) -> None:
     """Start the requested models as background processes.
 
     If `names` is None the registry's default models are started. Ports
     are assigned to avoid collisions with existing running processes.
     When `detach` is True the launcher exits after spawning children.
     """
-    refresh_model_registry()
-    registry = get_registry()
+    refresh_model_registry(config_file)
+    registry = get_registry(config_file)
     ensure_runtime_dirs()
     running = discover_running_models()
     reserved_ports: set[int] = set()
@@ -364,7 +370,7 @@ def start_models(names: list[str] | None, detach: bool = True) -> None:
         )
         proc = multiprocessing.Process(
             target=_process_worker,
-            args=(name, model),
+            args=(name, model, config_file),
             name=f"server-{name}",
         )
         proc.start()
@@ -435,13 +441,13 @@ def supervise_processes(processes: list[tuple[str, multiprocessing.Process]]) ->
                 pid_file(name).unlink()
 
 
-def stop_models(names: list[str]) -> None:
+def stop_models(names: list[str], config_file: Path | str | None) -> None:
     """Stop running model processes specified by `names`.
 
     If `names` is empty, all discovered running models will be targeted.
     PID metadata is removed for stopped or stale entries.
     """
-    refresh_model_registry()
+    refresh_model_registry(config_file)
     running = discover_running_models()
     target_names = names or list(running.keys())
     if not target_names:
@@ -500,22 +506,22 @@ def _wait_for_exit(pid: int, timeout: int) -> None:
         time.sleep(0.2)
 
 
-def show_models() -> None:
+def show_models(config_file: Path | str | None) -> None:
     """Log all configured models and their filesystem paths.
 
     Default models are annotated in the output.
     """
-    refresh_model_registry()
-    registry = get_registry()
+    refresh_model_registry(config_file)
+    registry = get_registry(config_file)
     default_names = set(registry.default_names())
     for entry in registry.all_entries():
         label = " [default]" if entry.name in default_names else ""
         logger.info(f"{entry.name} ({getattr(entry.config, 'model_path', 'unknown')}){label}")
 
 
-def status_models() -> None:
+def status_models(config_file: Path | str | None) -> None:
     """Report status for discovered running models (running/stopped)."""
-    refresh_model_registry()
+    refresh_model_registry(config_file)
     running = discover_running_models()
     if not running:
         logger.info("No models are currently running")
@@ -556,17 +562,26 @@ def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    config_file = args.config
+    if not config_file:
+        config_file = os.environ.get("MLXSERVER_MODELS_PATH")
+    if not config_file:
+        cwd_models = Path.cwd() / "models.yaml"
+        if cwd_models.exists():
+            config_file = cwd_models
+    # if still None, use default
+
     if args.command in {"start", "stop", "models", "status"}:
-        ensure_models_file_exists()
+        ensure_models_file_exists(config_file)
 
     if args.command == "start":
-        start_models(args.names, detach=True)
+        start_models(args.names, config_file=config_file)
     elif args.command == "stop":
-        stop_models(args.names)
+        stop_models(args.names, config_file)
     elif args.command == "models":
-        show_models()
+        show_models(config_file)
     elif args.command == "status":
-        status_models()
+        status_models(config_file)
     elif args.command == "help":
         show_help(parser)
     else:  # pragma: no cover - argparse enforces
