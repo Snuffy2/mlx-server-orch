@@ -57,7 +57,7 @@ def ensure_models_file_exists() -> None:
     config_path = paths.models_config_file()
     if not config_path.exists():
         logger.error(
-            f"Missing models configuration: {config_path}. Copy models.yaml-example or create one.",
+            f"Missing models configuration: {config_path}. Copy models.yaml-example or create one",
         )
         raise SystemExit(1)
 
@@ -70,38 +70,38 @@ def build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="mlx-server-orch",
-        description="MLX OpenAI Server Orchestrator — manage MLX model server processes.",
+        description="MLX OpenAI Server Orchestrator — manage MLX model server processes",
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     start_parser = subparsers.add_parser(
         "start",
-        help="Start one or more models (runs in background).",
+        help="Start one or more models (runs in background)",
     )
     start_parser.add_argument(
         "names",
         nargs="*",
         metavar="name",
-        help="Model nickname(s) to start.",
+        help="Model nickname(s) to start",
     )
 
     parser.start_parser = start_parser
 
     stop_parser = subparsers.add_parser(
         "stop",
-        help="Stop running model processes.",
+        help="Stop running model processes",
     )
     stop_parser.add_argument(
         "names",
         nargs="*",
         metavar="name",
-        help="Model nickname(s) to stop (default: all running).",
+        help="Model nickname(s) to stop (default: all running)",
     )
 
-    subparsers.add_parser("models", help="List available model nicknames and paths.")
-    subparsers.add_parser("status", help="Show running models and their PIDs.")
-    subparsers.add_parser("help", help="Show this help message.")
+    subparsers.add_parser("models", help="List available model nicknames and paths")
+    subparsers.add_parser("status", help="Show running models and their PIDs")
+    subparsers.add_parser("help", help="Show this help message")
 
     return parser
 
@@ -246,10 +246,7 @@ def assign_ports(
             setattr(model, "port", temp_port)
             claimed_ports.add(temp_port)
             used_ports[name] = temp_port
-            logger.info(
-                f"Assigning port {getattr(model, 'port', 'unknown')} to {name} "
-                f"({getattr(model, 'model_path', 'unknown')})"
-            )
+            logger.debug(f"Assigning port {getattr(model, 'port', 'unknown')} to {name}")
 
     return models
 
@@ -281,7 +278,7 @@ def load_pid_metadata(name: str) -> dict | None:
     except FileNotFoundError:
         return None
     except json.JSONDecodeError:
-        logger.warning(f"PID metadata for {name} is corrupt; removing.")
+        logger.warning(f"PID metadata for {name} is corrupt; removing")
         with contextlib.suppress(FileNotFoundError):
             pid_file(name).unlink()
         return None
@@ -379,7 +376,7 @@ def start_models(names: list[str] | None, detach: bool = True) -> None:
         started += 1
 
     if started == 0:
-        logger.info("No models started.")
+        logger.info("No models started")
         return
 
     if detach:
@@ -411,17 +408,17 @@ def supervise_processes(processes: list[tuple[str, multiprocessing.Process]]) ->
     logger.info(f"Supervising model processes: {names}")
 
     def _shutdown(signum, frame):  # noqa: ARG001
-        logger.info(f"Shutdown signal received ({signum}); stopping models.")
+        logger.info(f"Shutdown signal received ({signum}); stopping models")
         for name, proc in processes:
             if proc.is_alive():
                 try:
                     os.kill(proc.pid, signal.SIGINT)
                 except ProcessLookupError:
-                    logger.info(f"Process for {name} already exited.")
+                    logger.info(f"Process for {name} already exited")
         for name, proc in processes:
             proc.join(timeout=10)
             if proc.is_alive():
-                logger.warning(f"Process {name} did not exit; terminating.")
+                logger.warning(f"Process {name} did not exit; terminating")
                 proc.terminate()
                 proc.join(timeout=5)
         raise SystemExit(0)
@@ -448,21 +445,21 @@ def stop_models(names: list[str]) -> None:
     running = discover_running_models()
     target_names = names or list(running.keys())
     if not target_names:
-        logger.info("No running models found.")
+        logger.info("No running models found")
         return
 
     for name in target_names:
         meta = running.get(name)
         if not meta:
-            logger.warning(f"Model {name} is not running.")
+            logger.warning(f"Model {name} is not running")
             continue
         pid = meta["pid"]
         if not process_alive(pid):
-            logger.info(f"Model {name} had stale PID {pid}; cleaning up.")
+            logger.info(f"Model {name} had stale PID {pid}; cleaning up")
             with contextlib.suppress(FileNotFoundError):
                 pid_file(name).unlink()
             continue
-        logger.info(f"Stopping model {name} (pid={pid})...")
+        logger.info(f"Stopping model {name} (pid={pid})")
         _terminate_process(pid)
         with contextlib.suppress(FileNotFoundError):
             pid_file(name).unlink()
@@ -512,8 +509,8 @@ def show_models() -> None:
     registry = get_registry()
     default_names = set(registry.default_names())
     for entry in registry.all_entries():
-        label = " (default)" if entry.name in default_names else ""
-        logger.info(f"{entry.name}{label} -> {getattr(entry.config, 'model_path', 'unknown')}")
+        label = " [default]" if entry.name in default_names else ""
+        logger.info(f"{entry.name} ({getattr(entry.config, 'model_path', 'unknown')}){label}")
 
 
 def status_models() -> None:
@@ -521,7 +518,7 @@ def status_models() -> None:
     refresh_model_registry()
     running = discover_running_models()
     if not running:
-        logger.info("No models are currently running.")
+        logger.info("No models are currently running")
         return
 
     for name, meta in running.items():
