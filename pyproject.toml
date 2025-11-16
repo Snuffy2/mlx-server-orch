@@ -14,6 +14,7 @@ classifiers = [
 dynamic = ["version"]
 
 dependencies = [
+  #"mlx-openai-server>1.3.12",
   "mlx-vlm==0.3.5",
   "mlx-lm==0.28.3",
   "mlx-whisper==0.4.3",

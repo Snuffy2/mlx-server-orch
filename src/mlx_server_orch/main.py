@@ -57,8 +57,7 @@ def ensure_models_file_exists() -> None:
     config_path = paths.models_config_file()
     if not config_path.exists():
         logger.error(
-            "Missing models configuration: %s. Copy models.yaml-example or create one.",
-            config_path,
+            f"Missing models configuration: {config_path}. Copy models.yaml-example or create one.",
         )
         raise SystemExit(1)
 
@@ -127,7 +126,7 @@ def _process_worker(name, model):
 
     _register_pid_cleanup(name)
 
-    from app.main import start as _start  # noqa: PLC0415
+    from mlx_openai_server.main import start as _start  # noqa: PLC0415
 
     asyncio.run(_start(model))
 
@@ -384,7 +383,7 @@ def start_models(names: list[str] | None, detach: bool = True) -> None:
         return
 
     if detach:
-        logger.info(f"Started {started} model(s) and detaching.")
+        logger.info(f"Started {started} model(s)")
         sys.stdout.flush()
         sys.stderr.flush()
         os._exit(0)

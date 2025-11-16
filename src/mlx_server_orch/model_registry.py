@@ -14,7 +14,7 @@ from dataclasses import dataclass, fields
 from functools import lru_cache
 from pathlib import Path
 
-from app.config import MLXServerConfig
+from mlx_openai_server.config import MLXServerConfig
 import yaml
 
 from . import paths
