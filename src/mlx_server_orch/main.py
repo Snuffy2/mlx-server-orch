@@ -514,9 +514,25 @@ def show_models(config_file: Path | str | None) -> None:
     refresh_model_registry(config_file)
     registry = get_registry(config_file)
     default_names = set(registry.default_names())
-    for entry in registry.all_entries():
-        label = " [default]" if entry.name in default_names else ""
-        logger.info(f"{entry.name} ({getattr(entry.config, 'model_path', 'unknown')}){label}")
+
+    # Collect all entries
+    all_entries = list(registry.all_entries())
+
+    # Separate defaults and non-defaults
+    defaults = [entry for entry in all_entries if entry.name in default_names]
+    non_defaults = [entry for entry in all_entries if entry.name not in default_names]
+
+    # Sort both lists alphabetically by name
+    defaults.sort(key=lambda e: e.name)
+    non_defaults.sort(key=lambda e: e.name)
+
+    # Print defaults first with * prefix
+    for entry in defaults:
+        logger.info(f"*{entry.name} ({getattr(entry.config, 'model_path', 'unknown')}) [default]")
+
+    # Print non-defaults
+    for entry in non_defaults:
+        logger.info(f"{entry.name} ({getattr(entry.config, 'model_path', 'unknown')})")
 
 
 def status_models(config_file: Path | str | None) -> None:
